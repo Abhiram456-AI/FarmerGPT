@@ -1,46 +1,53 @@
-import requests
-from dotenv import load_dotenv
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 import os
+from dotenv import load_dotenv
 
-# Load environment variables from .env
+# Import your existing AI logic function
+from AI import run_ai_cli  # Updated to match the patched AI.py function
+
+# Load environment variables
 load_dotenv()
 
-API_KEY = os.getenv("OPENROUTER_API_KEY")  # Get API key from .env
-BASE_URL = "https://openrouter.ai/api/v1/chat/completions"
+app = FastAPI(title="FarmAI Backend API")
 
-def ask_model(question: str):
-    headers = {
-        "Authorization": f"Bearer {API_KEY}",
-        "Content-Type": "application/json"
-    }
-    payload = {
-        "model": "z-ai/glm-4.5-air:free",
-        "messages": [
-            {
-                "role": "system",
-                "content": (
-                    "You are an expert farming advisor. "
-                    "Give short, clear, and step-by-step answers. "
-                    "Use bullet points if possible. Avoid long paragraphs."
-                )
-            },
-            {"role": "user", "content": question}
-        ]
-    }
-    response = requests.post(BASE_URL, headers=headers, json=payload)
-    result = response.json()
+# Allow CORS for frontend
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Replace "*" with your frontend URL if needed
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-    if "choices" in result:
-        return result["choices"][0]["message"]["content"].strip()
-    else:
-        return f"❌ Error: {result}"
+# Request and response models
+class AIRequest(BaseModel):
+    question: str
+    language: str = "auto"  # default language, can be Tenglish, Telugu, Malayalam, etc.
 
-if __name__ == "__main__":
-    print("🌱 AI Farming Advisor (type 'exit' to quit)\n")
-    while True:
-        user_q = input("👨‍🌾 Your question: ")
-        if user_q.lower() in ["exit", "quit"]:
-            print("👋 Goodbye, farmer!")
-            break
-        answer = ask_model(user_q)
-        print("🤖 Answer:\n", answer, "\n")
+class AIResponse(BaseModel):
+    answer: str
+
+# Function to call your AI logic
+def ask_model(question: str, language: str) -> str:
+    return run_ai_cli(question, language)
+
+# Health check
+@app.get("/health")
+async def health():
+    return {"status": "ok"}
+
+# AI endpoint
+@app.post("/ask", response_model=AIResponse)
+async def ask_ai(data: AIRequest):
+    try:
+        answer = ask_model(data.question, data.language)
+        return AIResponse(answer=answer)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# Root endpoint
+@app.get("/")
+async def root():
+    return {"message": "FarmAI Backend is running"}

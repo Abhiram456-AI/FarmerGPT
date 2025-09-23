@@ -1,5 +1,19 @@
-venv/ 
-*.pyc 
-__pycache__/ 
-.env 
-.vscode/ 
+# Python
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.env
+
+# Node
+node_modules/
+dist/
+.vite/
+
+# macOS
+.DS_Store
+
+# IDEs
+.vscode/
+.idea/
