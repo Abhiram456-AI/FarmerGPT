@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 import asyncio
 
 # Import your existing AI logic function and Supabase client
-from AI import generate_answer, store_conversation  # Ensure AI.py has these functions
+from backend.AI import generate_answer, store_conversation  # Ensure AI.py has these functions
 
 # Load environment variables
 load_dotenv()
