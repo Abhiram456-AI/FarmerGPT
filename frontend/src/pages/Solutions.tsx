@@ -72,7 +72,7 @@ const Solutions = () => {
   ];
 
   return (
-    <div className="page-transition">
+      <div className="page-transition overflow-y-auto scroll-smooth">
       {/* Hero Section */}
       <section className="py-20 hero-gradient">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
@@ -193,7 +193,7 @@ const Solutions = () => {
               size="lg"
               className="glow-strong bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-lg px-8 py-4"
             >
-              <Link to="/chatbot">Try FarmAI Chatbot</Link>
+              <Link to="/chatbot">Try FarmerGPT Chatbot</Link>
             </Button>
           </div>
         </div>

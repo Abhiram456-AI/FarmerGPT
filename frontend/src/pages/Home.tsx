@@ -23,7 +23,7 @@ const Home = () => {
   ];
 
   return (
-    <div className="page-transition">
+      <div className="page-transition overflow-y-auto scroll-smooth">
       {/* Hero Section */}
       <section className="relative min-h-screen flex items-center justify-center hero-gradient overflow-hidden">
         <div className="absolute inset-0">
@@ -77,7 +77,7 @@ const Home = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
-              Why Choose FarmAI?
+              Why Choose FarmerGPT?
             </h2>
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
               Experience the future of farming with our cutting-edge AI technology

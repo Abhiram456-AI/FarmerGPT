@@ -1,7 +1,10 @@
 import { useState, useRef, useEffect } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { Send, Bot, User, Leaf, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { askAI } from '../services/api';
 
 interface Message {
   id: string;
@@ -38,25 +41,25 @@ const Chatbot = () => {
     "What subsidies are available for small farmers?"
   ];
 
-  const getBotResponse = (userMessage: string): string => {
-    const lowerMessage = userMessage.toLowerCase();
-    
-    if (lowerMessage.includes('tomato')) {
-      return "For tomatoes, the best planting time depends on your location. Generally, plant after the last frost when soil temperature reaches 60°F (15°C). Space plants 18-24 inches apart, provide support structures, and ensure 6-8 hours of sunlight daily. Water consistently but avoid wetting leaves to prevent disease.";
-    } else if (lowerMessage.includes('pest') || lowerMessage.includes('disease')) {
-      return "Common signs of crop diseases include yellowing leaves, spots, wilting, and stunted growth. For pest management, I recommend integrated pest management (IPM): monitor regularly, use beneficial insects, rotate crops, and apply targeted treatments only when necessary. Would you like specific advice for a particular crop or pest?";
-    } else if (lowerMessage.includes('fertilizer') || lowerMessage.includes('organic')) {
-      return "Organic fertilizers improve soil health long-term. Compost provides balanced nutrients, bone meal adds phosphorus for root development, and fish emulsion gives quick nitrogen. Apply in early spring and side-dress during growing season. Test your soil first to determine specific nutrient needs.";
-    } else if (lowerMessage.includes('subsidy') || lowerMessage.includes('government')) {
-      return "Agricultural subsidies vary by location and farm type. Common programs include crop insurance, conservation payments, and beginning farmer grants. Check with your local USDA office or agricultural extension service. I can help you understand eligibility requirements if you provide more details about your farm.";
-    } else if (lowerMessage.includes('weather') || lowerMessage.includes('climate')) {
-      return "Weather monitoring is crucial for farming success. I recommend tracking temperature, rainfall, humidity, and wind patterns. Use weather apps with agricultural features, consider installing weather stations, and plan activities around forecast windows. Climate change requires adapting varieties and practices.";
+  const speakText = (text: string) => {
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+      let lang = 'en-US'; // default English
+
+      // Basic detection using Unicode ranges
+      if (/[\u0C00-\u0C7F]/.test(text)) lang = 'te-IN'; // Telugu
+      else if (/[\u0C80-\u0CFF]/.test(text)) lang = 'kn-IN'; // Kannada
+      else if (/[\u0900-\u097F]/.test(text)) lang = 'hi-IN'; // Hindi
+
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = lang;
+      window.speechSynthesis.speak(utterance);
     } else {
-      return "That's a great farming question! Based on current agricultural best practices, I'd recommend consulting local extension services and conducting soil tests for your specific situation. Could you provide more details about your crop type, location, or specific concerns? This will help me give you more targeted advice.";
+      alert('Sorry, your browser does not support speech synthesis.');
     }
   };
 
-  const handleSendMessage = () => {
+  const handleSendMessage = async () => {
     if (!inputValue.trim()) return;
 
     const userMessage: Message = {
@@ -70,22 +73,32 @@ const Chatbot = () => {
     setInputValue('');
     setIsTyping(true);
 
-    // Simulate bot typing delay
-    setTimeout(() => {
-      const botResponse: Message = {
+    try {
+      const response = await askAI(userMessage.content);
+      const botMessage: Message = {
         id: (Date.now() + 1).toString(),
         type: 'bot',
-        content: getBotResponse(inputValue.trim()),
+        content: response,
         timestamp: new Date()
       };
-
-      setMessages(prev => [...prev, botResponse]);
+      setMessages(prev => [...prev, botMessage]);
+    } catch (err) {
+      const errorMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        type: 'bot',
+        content: "Sorry, there was an error fetching the response.",
+        timestamp: new Date()
+      };
+      setMessages(prev => [...prev, errorMessage]);
+      console.error(err);
+    } finally {
       setIsTyping(false);
-    }, 1500);
+    }
   };
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
+  const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
+      e.preventDefault();
       handleSendMessage();
     }
   };
@@ -135,10 +148,23 @@ const Chatbot = () => {
                         ? 'bg-primary text-primary-foreground' 
                         : 'bg-secondary/50 text-foreground border border-border/50'
                     }`}>
-                      <p className="text-sm leading-relaxed">{message.content}</p>
+                      <div className="text-sm leading-relaxed prose dark:prose-invert">
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                          {message.content}
+                        </ReactMarkdown>
+                      </div>
                       <p className={`text-xs mt-2 ${message.type === 'user' ? 'text-primary-foreground/70' : 'text-muted-foreground'}`}>
                         {message.timestamp.toLocaleTimeString()}
                       </p>
+                      {message.type === 'bot' && (
+                        <Button
+                          onClick={() => speakText(message.content)}
+                          className="mt-2 bg-primary hover:bg-primary/90 text-primary-foreground glow-hover"
+                          type="button"
+                        >
+                          Listen to FarmAI
+                        </Button>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -170,7 +196,7 @@ const Chatbot = () => {
                   <Input
                     value={inputValue}
                     onChange={(e) => setInputValue(e.target.value)}
-                    onKeyPress={handleKeyPress}
+                    onKeyDown={handleKeyDown}
                     placeholder="Ask me anything about farming..."
                     className="pr-12 glass border-primary/30 focus:border-primary glow-hover"
                     disabled={isTyping}
@@ -181,6 +207,7 @@ const Chatbot = () => {
                   onClick={handleSendMessage}
                   disabled={!inputValue.trim() || isTyping}
                   className="glow-hover bg-primary hover:bg-primary/90 text-primary-foreground"
+                  type="button"
                 >
                   <Send className="h-4 w-4" />
                 </Button>
@@ -216,6 +243,7 @@ const Chatbot = () => {
                     onClick={() => handleSuggestedQuestion(question)}
                     className="w-full text-left p-3 text-sm text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-lg transition-all glow-hover"
                     disabled={isTyping}
+                    type="button"
                   >
                     {question}
                   </button>

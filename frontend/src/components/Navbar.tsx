@@ -27,7 +27,7 @@ const Navbar = () => {
               <Leaf className="h-6 w-6 text-primary" />
             </div>
             <span className="text-xl font-bold text-foreground">
-              Farm<span className="text-primary">AI</span>
+              Farmer<span className="text-primary">GPT</span>
             </span>
           </Link>
 

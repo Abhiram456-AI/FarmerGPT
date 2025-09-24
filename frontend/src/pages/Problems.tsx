@@ -47,7 +47,7 @@ const Problems = () => {
   ];
 
   return (
-    <div className="page-transition">
+    <div className="page-transition overflow-y-auto scroll-smooth">
       {/* Hero Section */}
       <section className="py-20 hero-gradient">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
