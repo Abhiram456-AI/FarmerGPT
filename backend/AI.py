@@ -3,6 +3,8 @@ import requests
 from dotenv import load_dotenv
 import os
 import threading
+import pyttsx3
+import speech_recognition as sr
 
 # Load environment variables from .env
 load_dotenv()
@@ -15,9 +17,11 @@ SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 SUPPORTED_LANGUAGES = ["auto", "Telugu", "Malayalam", "English", "Kannada"]
-
-# How many past Q&As to remember
 CONVERSATION_MEMORY = 5
+conversation_history = []
+
+# Initialize TTS engine
+tts_engine = pyttsx3.init()
 
 def validate_language(language: str) -> str:
     language = language.strip()
@@ -25,22 +29,44 @@ def validate_language(language: str) -> str:
         return "auto"
     return language
 
-def ask_model(question: str, language: str = "auto") -> str:
-    """
-    Ask the AI model a question and get a response.
-    language: 'auto' (default), 'Telugu', 'Malayalam', 'English', 'Kannada', etc.
-    """
-    language = validate_language(language)
+# STT function
+def transcribe_audio(audio_path: str) -> str:
+    recognizer = sr.Recognizer()
+    with sr.AudioFile(audio_path) as source:
+        audio_data = recognizer.record(source)
+    try:
+        text = recognizer.recognize_google(audio_data)
+        return text
+    except Exception as e:
+        return f"[STT Error]: {str(e)}"
+
+# TTS function
+def speak_text(text: str):
+    try:
+        tts_engine.say(text)
+        tts_engine.runAndWait()
+    except Exception as e:
+        print(f"[TTS Error]: {str(e)}")
+
+# Build messages with conversation memory
+def build_messages(question: str, language: str) -> list:
+    messages = []
     system_message = (
         f"You are an expert farming advisor. Answer in {language}. "
-        "Give short, clear, and step-by-step answers. "
-        "Use bullet points if possible. Avoid long paragraphs."
+        "Give short, clear, and step-by-step answers. Use bullet points if possible. Avoid long paragraphs."
     )
-
-    # Build messages list with system message first and current user question
-    messages = [{"role": "system", "content": system_message}]
+    messages.append({"role": "system", "content": system_message})
+    # Append last N Q&As
+    for qa in conversation_history[-CONVERSATION_MEMORY:]:
+        messages.append({"role": "user", "content": qa['question']})
+        messages.append({"role": "assistant", "content": qa['answer']})
     messages.append({"role": "user", "content": question})
+    return messages
 
+# Ask AI model
+def ask_model(question: str, language: str = "auto") -> str:
+    language = validate_language(language)
+    messages = build_messages(question, language)
     headers = {
         "Authorization": f"Bearer {API_KEY}",
         "Content-Type": "application/json"
@@ -60,20 +86,8 @@ def ask_model(question: str, language: str = "auto") -> str:
     except Exception as e:
         return f"Exception: {str(e)}"
 
-# Function to be used by FastAPI
-def generate_answer(question: str, language: str = "auto") -> str:
-    answer = ask_model(question, language)
-    # Store conversation asynchronously
-    threading.Thread(target=store_conversation, args=(question, answer, language), daemon=True).start()
-    return answer
-
-# The 'conversations' table must be created manually in Supabase before storing conversations.
 # Store conversation in Supabase
 def store_conversation(user_question: str, ai_answer: str, language: str = "auto"):
-    """
-    Store each Q&A in Supabase table 'conversations'.
-    Table columns: id (serial), question (text), answer (text), language (text), created_at (timestamp)
-    """
     try:
         supabase.table("conversations").insert({
             "question": user_question,
@@ -83,19 +97,43 @@ def store_conversation(user_question: str, ai_answer: str, language: str = "auto
     except Exception as e:
         print(f"Could not store conversation: {str(e)}")
 
+# Unified function: text or audio input
+def generate_answer(question: str = None, language: str = "auto", audio_file: str = None, speak: bool = False) -> str:
+    if audio_file:
+        question = transcribe_audio(audio_file)
+    answer = ask_model(question, language)
+    # Update conversation history
+    conversation_history.append({"question": question, "answer": answer})
+    # Store asynchronously
+    threading.Thread(target=store_conversation, args=(question, answer, language), daemon=True).start()
+    if speak:
+        speak_text(answer)
+    return answer
+
+# CLI interface
 if __name__ == "__main__":
     print("🌱 AI Farming Advisor (type 'exit' to quit)\n")
     while True:
-        user_input = input("👨‍🌾 Your question (optionally 'question | language'): ")
-        if user_input.lower() in ["exit", "quit"]:
+        choice = input("Do you want to (1) Type or (2) Speak your question? Enter 1 or 2: ").strip()
+        if choice.lower() in ["exit", "quit"]:
             print("Goodbye, farmer!")
             break
-        if '|' in user_input:
-            question_part, language_part = user_input.split('|', 1)
-            question = question_part.strip()
-            language = validate_language(language_part.strip())
+
+        if choice == "2":
+            audio_path = input("Enter path to audio file (WAV format recommended): ").strip()
+            answer = generate_answer(audio_file=audio_path, speak=True)
         else:
-            question = user_input
-            language = "auto"
-        answer = generate_answer(question, language)
+            user_input = input("👨‍🌾 Your question (optionally 'question | language'): ").strip()
+            if user_input.lower() in ["exit", "quit"]:
+                print("Goodbye, farmer!")
+                break
+            if '|' in user_input:
+                question_part, language_part = user_input.split('|', 1)
+                question = question_part.strip()
+                language = validate_language(language_part.strip())
+            else:
+                question = user_input
+                language = "auto"
+            answer = generate_answer(question, language, speak=True)
+
         print("Answer:\n", answer, "\n")

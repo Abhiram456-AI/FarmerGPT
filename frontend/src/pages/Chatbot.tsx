@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { Send, Bot, User, Leaf, Sparkles } from 'lucide-react';
+import { Send, Bot, User, Leaf, Sparkles, Mic } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { askAI } from '../services/api';
@@ -43,19 +43,55 @@ const Chatbot = () => {
 
   const speakText = (text: string) => {
     if ('speechSynthesis' in window) {
-      window.speechSynthesis.cancel();
-      let lang = 'en-US'; // default English
+      try {
+        window.speechSynthesis.cancel();
+        let lang = 'en-US';
+        if (/[\u0C00-\u0C7F]/.test(text)) lang = 'te-IN';
+        else if (/[\u0C80-\u0CFF]/.test(text)) lang = 'kn-IN';
+        else if (/[\u0900-\u097F]/.test(text)) lang = 'hi-IN';
 
-      // Basic detection using Unicode ranges
-      if (/[\u0C00-\u0C7F]/.test(text)) lang = 'te-IN'; // Telugu
-      else if (/[\u0C80-\u0CFF]/.test(text)) lang = 'kn-IN'; // Kannada
-      else if (/[\u0900-\u097F]/.test(text)) lang = 'hi-IN'; // Hindi
-
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = lang;
-      window.speechSynthesis.speak(utterance);
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = lang;
+        window.speechSynthesis.speak(utterance);
+      } catch (err) {
+        console.error('Speech synthesis error:', err);
+        alert('Failed to play audio for the response.');
+      }
     } else {
       alert('Sorry, your browser does not support speech synthesis.');
+    }
+  };
+
+  const startVoiceInput = () => {
+    if (!('webkitSpeechRecognition' in window)) {
+      alert('Your browser does not support voice input.');
+      return;
+    }
+
+    const recognition = new (window as any).webkitSpeechRecognition();
+    recognition.lang = 'en-US';
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+
+    recognition.onresult = (event: any) => {
+      const transcript = event.results[0][0].transcript;
+      setInputValue(transcript);
+    };
+
+    recognition.onerror = (event: any) => {
+      console.error('Speech recognition error:', event.error);
+      alert(`Voice input failed: ${event.error}`);
+    };
+
+    recognition.onend = () => {
+      console.log('Speech recognition ended.');
+    };
+
+    try {
+      recognition.start();
+    } catch (err) {
+      console.error('Failed to start voice input:', err);
+      alert('Failed to start voice input. Please try again.');
     }
   };
 
@@ -162,7 +198,7 @@ const Chatbot = () => {
                           className="mt-2 bg-primary hover:bg-primary/90 text-primary-foreground glow-hover"
                           type="button"
                         >
-                          Listen to FarmAI
+                          Listen to FarmerGPT
                         </Button>
                       )}
                     </div>
@@ -201,6 +237,11 @@ const Chatbot = () => {
                     className="pr-12 glass border-primary/30 focus:border-primary glow-hover"
                     disabled={isTyping}
                   />
+                  <div className="absolute right-10 top-1/2 transform -translate-y-1/2">
+                    <Button onClick={startVoiceInput} className="p-2 bg-primary/10 hover:bg-primary/20 rounded-full">
+                      <Mic className="h-4 w-4 text-primary" />
+                    </Button>
+                  </div>
                   <Sparkles className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-primary/50" />
                 </div>
                 <Button
