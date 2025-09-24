@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -35,6 +35,14 @@ if os.path.exists(frontend_build_dir):
             return FileResponse(index_path)
         else:
             return {"message": "Frontend build exists but index.html is missing."}
+
+    # Catch-all route to serve index.html for React router paths
+    @app.get("/{full_path:path}", include_in_schema=False)
+    async def serve_react(full_path: str):
+        index_path = os.path.join(frontend_build_dir, "index.html")
+        if os.path.exists(index_path):
+            return FileResponse(index_path)
+        return {"message": "Frontend not found"}
 else:
     @app.get("/", include_in_schema=False)
     async def backend_only():
