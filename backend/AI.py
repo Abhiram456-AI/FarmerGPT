@@ -3,7 +3,6 @@ import requests
 from dotenv import load_dotenv
 import os
 import threading
-import pyttsx3
 import speech_recognition as sr
 
 # Load environment variables from .env
@@ -19,9 +18,6 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 SUPPORTED_LANGUAGES = ["auto", "Telugu", "Malayalam", "English", "Kannada"]
 CONVERSATION_MEMORY = 5
 conversation_history = []
-
-# Initialize TTS engine
-tts_engine = pyttsx3.init()
 
 def validate_language(language: str) -> str:
     language = language.strip()
@@ -40,14 +36,6 @@ def transcribe_audio(audio_path: str) -> str:
     except Exception as e:
         return f"[STT Error]: {str(e)}"
 
-# TTS function
-def speak_text(text: str):
-    try:
-        tts_engine.say(text)
-        tts_engine.runAndWait()
-    except Exception as e:
-        print(f"[TTS Error]: {str(e)}")
-
 # Build messages with conversation memory
 def build_messages(question: str, language: str) -> list:
     messages = []
@@ -56,7 +44,6 @@ def build_messages(question: str, language: str) -> list:
         "Give short, clear, and step-by-step answers. Use bullet points if possible. Avoid long paragraphs."
     )
     messages.append({"role": "system", "content": system_message})
-    # Append last N Q&As
     for qa in conversation_history[-CONVERSATION_MEMORY:]:
         messages.append({"role": "user", "content": qa['question']})
         messages.append({"role": "assistant", "content": qa['answer']})
@@ -98,16 +85,12 @@ def store_conversation(user_question: str, ai_answer: str, language: str = "auto
         print(f"Could not store conversation: {str(e)}")
 
 # Unified function: text or audio input
-def generate_answer(question: str = None, language: str = "auto", audio_file: str = None, speak: bool = False) -> str:
+def generate_answer(question: str = None, language: str = "auto", audio_file: str = None) -> str:
     if audio_file:
         question = transcribe_audio(audio_file)
     answer = ask_model(question, language)
-    # Update conversation history
     conversation_history.append({"question": question, "answer": answer})
-    # Store asynchronously
     threading.Thread(target=store_conversation, args=(question, answer, language), daemon=True).start()
-    if speak:
-        speak_text(answer)
     return answer
 
 # CLI interface
@@ -121,7 +104,7 @@ if __name__ == "__main__":
 
         if choice == "2":
             audio_path = input("Enter path to audio file (WAV format recommended): ").strip()
-            answer = generate_answer(audio_file=audio_path, speak=True)
+            answer = generate_answer(audio_file=audio_path)
         else:
             user_input = input("👨‍🌾 Your question (optionally 'question | language'): ").strip()
             if user_input.lower() in ["exit", "quit"]:
@@ -134,6 +117,6 @@ if __name__ == "__main__":
             else:
                 question = user_input
                 language = "auto"
-            answer = generate_answer(question, language, speak=True)
+            answer = generate_answer(question, language)
 
         print("Answer:\n", answer, "\n")
