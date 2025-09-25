@@ -15,15 +15,21 @@ SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-SUPPORTED_LANGUAGES = ["auto", "Telugu", "Malayalam", "English", "Kannada"]
+# Map language names to their native scripts
+LANGUAGE_MAP = {
+    "auto": "English",
+    "Telugu": "తెలుగు",
+    "Malayalam": "മലയാളം",
+    "English": "English",
+    "Kannada": "ಕನ್ನಡ"
+}
+
 CONVERSATION_MEMORY = 5
 conversation_history = []
 
 def validate_language(language: str) -> str:
     language = language.strip()
-    if language not in SUPPORTED_LANGUAGES:
-        return "auto"
-    return language
+    return LANGUAGE_MAP.get(language, "English")
 
 # STT function
 def transcribe_audio(audio_path: str) -> str:
